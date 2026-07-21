@@ -1493,13 +1493,11 @@ const MusicEngine = {
     osc.stop(startTime+duration);
     this.nodes.push(osc);
   },
-  // Pentatonic ambient chord progression
+  // Pentatonic ambient chord progression - continuous loop
   start(){
     if(!this.ctx)return;
-    if(this.playing)return;
     this.playing = true;
     const now = this.ctx.currentTime;
-    const pentatonic = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25];
     const chords = [
       [261.63, 329.63, 392.00],
       [293.66, 392.00, 440.00],
@@ -1507,7 +1505,7 @@ const MusicEngine = {
       [261.63, 329.63, 440.00],
     ];
     const beat = 2.5;
-    const totalDuration = chords.length * beat * 2 + 4;
+    // Play 3 rounds of chords
     for(let round=0; round<3; round++){
       chords.forEach((chord, ci)=>{
         const t = now + (round*chords.length + ci)*beat;
@@ -1516,13 +1514,16 @@ const MusicEngine = {
         });
       });
     }
+    // Gentle high melody
     const melody = [523.25, 440.00, 587.33, 659.25, 523.25, 587.33, 440.00, 392.00];
     melody.forEach((freq, i)=>{
       this.playNote(freq, now + i*beat*0.75, beat*0.7, 0.35);
     });
+    // Schedule next loop after current finishes (~32s)
     this._timer = setTimeout(()=>{
-      if(this.playing) this.start();
-    }, (totalDuration-1)*1000);
+      this.playing = false;
+      this.start();
+    }, 34000);
   },
   stop(){
     this.playing = false;
