@@ -1546,24 +1546,35 @@ function toggleMusic(){
   document.getElementById('musicBtn').classList.toggle('on', musicOn);
 }
 
-// Auto-start background music
-setTimeout(()=>{
+// Auto-start background music (aggressive retry)
+function _startMusic(){
+  if(MusicEngine.playing) return;
   MusicEngine.init();
   if(MusicEngine.ctx){
-    if(MusicEngine.ctx.state==='suspended') MusicEngine.ctx.resume();
-    MusicEngine.start();
-    musicOn = true;
-    document.getElementById('musicBtn').textContent = '🔊';
-    document.getElementById('musicBtn').classList.add('on');
-    document.addEventListener('click', function _resumeMusic(){
-      if(MusicEngine.ctx && MusicEngine.ctx.state==='suspended'){
-        MusicEngine.ctx.resume();
-        if(!MusicEngine.playing) MusicEngine.start();
+    MusicEngine.ctx.resume().then(()=>{
+      if(!MusicEngine.playing){
+        MusicEngine.start();
+        musicOn = true;
+        document.getElementById('musicBtn').textContent = '🔊';
+        document.getElementById('musicBtn').classList.add('on');
       }
-      document.removeEventListener('click', _resumeMusic);
-    }, {once:true});
+    }).catch(()=>{});
   }
-}, 800);
+}
+// Try immediately, then retry
+_startMusic();
+let _retryCount = 0;
+let _retryTimer = setInterval(()=>{
+  _retryCount++;
+  _startMusic();
+  if(MusicEngine.playing || _retryCount > 15) clearInterval(_retryTimer);
+}, 300);
+// Click-to-resume fallback
+document.addEventListener('click', function _resume(){
+  if(MusicEngine.ctx && MusicEngine.ctx.state==='suspended'){
+    MusicEngine.ctx.resume().then(()=>{ if(!MusicEngine.playing) MusicEngine.start(); });
+  }
+}, {once:true, passive:true});
 </script>
 </body>
 </html>
