@@ -35,7 +35,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Serif SC','SimSun'
 .main{margin-left:200px;padding:80px 24px 60px;transition:margin-left .3s}
 .main.expanded{margin-left:0}
 /* chapter card */
-.chapter{max-width:820px;margin:0 auto 36px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;scroll-margin-top:80px;transition:.3s}
+.chapter{width:100%;max-width:900px;margin:0 0 36px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;scroll-margin-top:80px;transition:.3s}
 .chapter:hover{border-color:var(--accent);box-shadow:0 0 30px rgba(184,134,11,.08)}
 .chapter .ch-title{font-size:1.15rem;color:var(--gold);font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
 .chapter .ch-title .ch-num{background:var(--accent);color:#fff;font-size:.7rem;padding:2px 10px;border-radius:20px;font-weight:700}
@@ -67,13 +67,17 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Serif SC','SimSun'
 .no-match{text-align:center;padding:60px 20px;color:var(--text2);font-size:.95rem}
 /* calligraphy font for original text */
 .ch-original p{font-family:'Ma Shan Zheng','KaiTi','STKaiti',serif;font-size:2.3rem;line-height:2.8;letter-spacing:6px;text-indent:1.8em}
-.ch-original ruby{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 1px}
-.ch-original ruby rt{font-family:Arial,'Noto Serif SC',sans-serif;font-size:.85rem;color:#daa520;letter-spacing:0;line-height:1.4;margin-bottom:2px;font-weight:400}
+.ch-original ruby{display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-start;vertical-align:top;line-height:1;margin:0;padding:0;width:auto}
+.ch-original ruby rt{font-family:Arial,'Noto Serif SC',sans-serif;font-size:.85rem;color:#daa520;letter-spacing:0;line-height:1.15;font-weight:400;user-select:none;margin-bottom:1px}
 .ch-original .pinyin-hidden ruby rt{display:none}
 /* pinyin toggle btn */
 #pinyinBtn{background:none;border:1px solid var(--border);color:var(--text2);font-size:.7rem;padding:4px 10px;border-radius:6px;cursor:pointer;transition:.2s;font-family:inherit;white-space:nowrap}
 #pinyinBtn:hover{background:var(--card2);color:var(--gold);border-color:var(--accent)}
 #pinyinBtn.on{color:var(--gold);border-color:var(--accent)}
+/* music btn */
+#musicBtn{background:none;border:1px solid var(--border);color:var(--text2);font-size:.9rem;padding:4px 10px;border-radius:6px;cursor:pointer;transition:.2s;font-family:inherit;line-height:1}
+#musicBtn:hover{background:var(--card2);color:var(--gold);border-color:var(--accent)}
+#musicBtn.on{color:var(--gold);border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -83,6 +87,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Serif SC','SimSun'
   <button id="menuBtn" onclick="toggleSidebar()">☰</button>
   <h1>道德经详解 <span>· 老子</span></h1>
   <button id="pinyinBtn" onclick="togglePinyin()">拼音</button>
+  <button id="musicBtn" onclick="toggleMusic()">🔊</button>
   <span class="sub">全文 81 章 · 逐章解读</span>
 </header>
 
@@ -1461,6 +1466,104 @@ function addRubyToText(p) {
   if (buf) html += buf;
   p.innerHTML = html;
 }
+
+// ====== BACKGROUND MUSIC (from sudoku-game) ======
+const MusicEngine = {
+  ctx: null, gain: null, playing: false, nodes: [],
+  init(){
+    try{
+      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      this.gain = this.ctx.createGain();
+      this.gain.gain.value = 0.12;
+      this.gain.connect(this.ctx.destination);
+    }catch(e){return false}
+    return true;
+  },
+  playNote(freq, startTime, duration, gainVal){
+    if(!this.ctx)return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gainVal*0.3, startTime);
+    g.gain.exponentialRampToValueAtTime(0.001, startTime+duration);
+    osc.connect(g);
+    g.connect(this.gain);
+    osc.start(startTime);
+    osc.stop(startTime+duration);
+    this.nodes.push(osc);
+  },
+  // Pentatonic ambient chord progression
+  start(){
+    if(!this.ctx)return;
+    if(this.playing)return;
+    this.playing = true;
+    const now = this.ctx.currentTime;
+    const pentatonic = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25];
+    const chords = [
+      [261.63, 329.63, 392.00],
+      [293.66, 392.00, 440.00],
+      [220.00, 261.63, 329.63],
+      [261.63, 329.63, 440.00],
+    ];
+    const beat = 2.5;
+    const totalDuration = chords.length * beat * 2 + 4;
+    for(let round=0; round<3; round++){
+      chords.forEach((chord, ci)=>{
+        const t = now + (round*chords.length + ci)*beat;
+        chord.forEach((freq, fi)=>{
+          this.playNote(freq, t + fi*0.3, beat*1.6, 0.7);
+        });
+      });
+    }
+    const melody = [523.25, 440.00, 587.33, 659.25, 523.25, 587.33, 440.00, 392.00];
+    melody.forEach((freq, i)=>{
+      this.playNote(freq, now + i*beat*0.75, beat*0.7, 0.35);
+    });
+    this._timer = setTimeout(()=>{
+      if(this.playing) this.start();
+    }, (totalDuration-1)*1000);
+  },
+  stop(){
+    this.playing = false;
+    if(this._timer) clearTimeout(this._timer);
+    this.nodes.forEach(n=>{try{n.stop()}catch(e){}});
+    this.nodes = [];
+  },
+  toggle(){
+    if(this.playing){this.stop(); return false}
+    if(!this.ctx)this.init();
+    if(this.ctx && this.ctx.state==='suspended') this.ctx.resume();
+    this.start();
+    return true;
+  }
+};
+
+let musicOn = false;
+function toggleMusic(){
+  musicOn = MusicEngine.toggle();
+  document.getElementById('musicBtn').textContent = musicOn ? '🔊' : '🔇';
+  document.getElementById('musicBtn').classList.toggle('on', musicOn);
+}
+
+// Auto-start background music
+setTimeout(()=>{
+  MusicEngine.init();
+  if(MusicEngine.ctx){
+    if(MusicEngine.ctx.state==='suspended') MusicEngine.ctx.resume();
+    MusicEngine.start();
+    musicOn = true;
+    document.getElementById('musicBtn').textContent = '🔊';
+    document.getElementById('musicBtn').classList.add('on');
+    document.addEventListener('click', function _resumeMusic(){
+      if(MusicEngine.ctx && MusicEngine.ctx.state==='suspended'){
+        MusicEngine.ctx.resume();
+        if(!MusicEngine.playing) MusicEngine.start();
+      }
+      document.removeEventListener('click', _resumeMusic);
+    }, {once:true});
+  }
+}, 800);
 </script>
 </body>
 </html>
